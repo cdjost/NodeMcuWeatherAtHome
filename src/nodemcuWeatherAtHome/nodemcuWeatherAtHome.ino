@@ -1,7 +1,9 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <ESP8266WiFi.h>
 #include <HTU21D.h>
+#include "wifi_conf.h"
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -17,16 +19,26 @@ void setup() {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
+
   
   delay(2000);
+
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Connecting to Wifi Network");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  Serial.print("Connected, IP address: ");
+  Serial.println(WiFi.localIP());
   
   display.clearDisplay();
 
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(0, 10);
-  // Display static text
-  display.display();
 
   sensor.begin();
 }
@@ -35,15 +47,15 @@ void loop() {
   if(sensor.measure()) {
     float temperature = sensor.getTemperature();
     float humidity = sensor.getHumidity();
-
+    
     display.clearDisplay();
-    display.setCursor(0, 0);
+    display.setCursor(0,0);
     display.print("Temperature (C): ");
     display.println(temperature);
 
     display.print("Humidity (%RH): ");
     display.println(humidity);
-    display.display();
+    // display.display();
 
   }
 
