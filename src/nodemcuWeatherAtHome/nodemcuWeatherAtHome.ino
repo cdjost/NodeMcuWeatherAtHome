@@ -17,7 +17,6 @@ HTU21D sensor;
 
 // Wifi Signalstärke
 int32_t rssi;
-const char* host = "WeatherAtHome1";
 
 // NTP
 WiFiUDP ntpUDP;
