@@ -3,6 +3,8 @@
 #include <Adafruit_SSD1306.h>
 #include <ESP8266WiFi.h>
 #include <HTU21D.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 #include "wifi_conf.h"
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -10,6 +12,13 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
+
+// Wifi Signalstärke
+int32_t RSSI;
+
+// NTP
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 void setup() {
  Serial.begin(9600); /* begin serial for debug */
@@ -34,30 +43,64 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
+
+  timeClient.begin();
+  timeClient.setTimeOffset(3600);
   
   display.clearDisplay();
-
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
 
   sensor.begin();
 }
 
 void loop() {
+  timeClient.update();
+  int currentHour = timeClient.getHours();
+  int currentMinute = timeClient.getMinutes();
+  
+  display.clearDisplay();
+   
+  RSSI = WiFi.RSSI();
+  display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
+  
+  if (RSSI > -65) {
+  display.fillRect(14,1,2,16,BLACK);
+  }
+  if (RSSI > -70) {
+  display.fillRect(10,5,2,12,BLACK);
+  }
+  if (RSSI > -78) {
+  display.fillRect(6,9,2,8,BLACK);
+  }
+  if (RSSI > -82) {
+  display.fillRect(2,13,2,4,BLACK);
+  }
+
+  display.setTextSize(2); // Texthöhe 14 Pixel Breite 10?
+  display.setTextColor(BLACK);
+
+  display.setCursor(65,2);
+  String currentTime = timeClient.getFormattedTime();
+  display.print(currentTime.substring(0,5)); // Sekunden abschneiden
+  //display.println(timeClient.getFormattedTime());
+  //Serial.print("Formatted time: ");
+  //Serial.println(timeClient.getFormattedTime());
+
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+ 
   if(sensor.measure()) {
     float temperature = sensor.getTemperature();
     float humidity = sensor.getHumidity();
     
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.print("Temperature (C): ");
+    display.setCursor(0,45);
+    display.print("Temperatur (C): ");
     display.println(temperature);
 
-    display.print("Humidity (%RH): ");
+    display.print("Luftf.   (%RH): ");
     display.println(humidity);
-    // display.display();
 
   }
 
+  display.display();
   delay(5000);
 }
