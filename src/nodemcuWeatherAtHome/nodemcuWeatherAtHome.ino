@@ -30,6 +30,8 @@ float temperature = 100;
 float humidity = -100;
 int ppm_uart = -1;
 
+unsigned long air_warn_start_time = 0;
+
 MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
 void setup() {
@@ -49,17 +51,6 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-
-  /*
-  if (co2.isPreHeating()) {
-    Serial.print("Preheating");
-    while (co2.isPreHeating()) {
-      delay(5000);
-      Serial.print(".");
-    }
-    Serial.println();
-  }
-  */
 
   ArduinoOTA.setHostname(HOST);
   ArduinoOTA.setPassword(OTA_PASS);
@@ -191,11 +182,23 @@ void renderDisplay() {
   }
 
   if(humidity > 60 || ppm_uart > 1000){
-    display.fillRect(0,50,SCREEN_WIDTH,14,WHITE);
-    display.setCursor(25, 55);
-    display.setTextColor(BLACK);
-    display.print("bitte Lueften");
-    display.setTextColor(WHITE);
+    if(air_warn_start_time == 0){
+      air_warn_start_time = millis();
+    }
+    // 30 Sekunden lang Warnung anzeigen danach 30 Sekunden lang Messwerte
+    if((millis() - air_warn_start_time) < 30000){
+      display.fillRect(0,50,SCREEN_WIDTH,14,WHITE);
+      display.setCursor(25, 55);
+      display.setTextColor(BLACK);
+      display.print("bitte Lueften");
+      display.setTextColor(WHITE);
+    }
+    else if((millis() - air_warn_start_time) > 60000){
+      air_warn_start_time = 0;
+    }
+  }
+  else{
+    air_warn_start_time = 0;
   }
 
   display.display();
