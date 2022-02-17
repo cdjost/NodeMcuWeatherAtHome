@@ -7,9 +7,13 @@
 #include <WiFiUdp.h>
 #include "config.h"
 #include <ArduinoOTA.h>
+#include <MHZ.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+#define MH_Z19_RX D7  // D7
+#define MH_Z19_TX D6  // D6
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
@@ -17,7 +21,6 @@ HTU21D sensor;
 
 // Wifi Signalstärke
 int32_t RSSI;
-const char* host = "WeatherAtHome1";
 
 // NTP
 WiFiUDP ntpUDP;
@@ -25,6 +28,9 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 float temperature = 100;
 float humidity = -100;
+int ppm_uart = -1;
+
+MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
 void setup() {
   Serial.begin(9600); /* begin serial for debug */
@@ -44,6 +50,16 @@ void setup() {
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
 
+  /*
+  if (co2.isPreHeating()) {
+    Serial.print("Preheating");
+    while (co2.isPreHeating()) {
+      delay(5000);
+      Serial.print(".");
+    }
+    Serial.println();
+  }
+  */
 
   ArduinoOTA.setHostname(HOST);
   ArduinoOTA.setPassword(OTA_PASS);
@@ -119,6 +135,9 @@ void readSensorData() {
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
   }
+  if(co2.isReady()){
+    ppm_uart = co2.readCO2UART();
+  }
 }
 
 void renderDisplay() {
@@ -153,7 +172,7 @@ void renderDisplay() {
   // display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
      
   display.setTextSize(3);
-  display.setCursor(0, (SCREEN_HEIGHT/2) - 10);
+  display.setCursor(2, (SCREEN_HEIGHT/2) - 10);
     
   display.print(temperature);
   display.println(" C");
@@ -162,8 +181,22 @@ void renderDisplay() {
     
   display.setTextSize(1);
   display.setCursor(0, 55);
-  display.print("(%RH): ");
-  display.println(humidity);
+  display.printf("%.2f%%RH", humidity);
+  display.setCursor(80, 55);
+  if(ppm_uart < 0){
+    display.print("n/a ppm");
+  }
+  else{
+    display.printf("%dppm", ppm_uart);
+  }
+
+  if(humidity > 60 || ppm_uart > 1000){
+    display.fillRect(0,50,SCREEN_WIDTH,14,WHITE);
+    display.setCursor(25, 55);
+    display.setTextColor(BLACK);
+    display.print("bitte Lueften");
+    display.setTextColor(WHITE);
+  }
 
   display.display();
 }
