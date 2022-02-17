@@ -5,7 +5,7 @@
 #include <HTU21D.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
-#include "wifi_conf.h"
+#include "config.h"
 #include <ArduinoOTA.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -45,7 +45,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
 
-  ArduinoOTA.setHostname(host);
+  ArduinoOTA.setHostname(HOST);
   ArduinoOTA.setPassword(OTA_PASS);
   
   ArduinoOTA.onStart([]() {
