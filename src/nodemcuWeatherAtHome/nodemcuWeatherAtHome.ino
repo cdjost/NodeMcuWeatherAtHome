@@ -16,7 +16,7 @@ HTU21D sensor;
 
 
 // Wifi Signalstärke
-int32_t RSSI;
+int32_t rssi;
 const char* host = "WeatherAtHome1";
 
 // NTP
@@ -62,17 +62,23 @@ void setup() {
 
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
-    } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
-    } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
-    } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
-    } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
+    switch(error) {
+      case OTA_AUTH_ERROR:
+        Serial.println("Auth Failed");
+        break;
+      case OTA_BEGIN_ERROR:
+        Serial.println("Begin Failed");
+        break;
+      case OTA_CONNECT_ERROR:
+        Serial.println("Connect Failed");
+        break;
+      case OTA_RECEIVE_ERROR:
+        Serial.println("Receive Failed");
+        break;
+      case OTA_END_ERROR:
+        Serial.println("End Failed");
     }
+    
     delay(3000);
     ESP.restart();
   });
@@ -114,7 +120,7 @@ void initDisplay() {
 }
 
 void readSensorData() {
-  RSSI = WiFi.RSSI();
+  rssi = WiFi.RSSI();
   if(sensor.measure()){
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
@@ -127,18 +133,18 @@ void renderDisplay() {
   display.dim(true);
 
   display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
-  
-  if (RSSI > -65) {
-  display.fillRect(14,1,2,16,BLACK);
+
+  if (rssi > -65) {
+    display.fillRect(14,1,2,16,BLACK);
   }
-  if (RSSI > -70) {
-  display.fillRect(10,5,2,12,BLACK);
+  if (rssi > -70) {
+    display.fillRect(10,5,2,12,BLACK);
   }
-  if (RSSI > -78) {
-  display.fillRect(6,9,2,8,BLACK);
+  if (rssi > -78) {
+    display.fillRect(6,9,2,8,BLACK);
   }
-  if (RSSI > -82) {
-  display.fillRect(2,13,2,4,BLACK);
+  if (rssi > -82) {
+    display.fillRect(2,13,2,4,BLACK);
   }
 
   display.setTextSize(2); // Texthöhe 14 Pixel Breite 10?
