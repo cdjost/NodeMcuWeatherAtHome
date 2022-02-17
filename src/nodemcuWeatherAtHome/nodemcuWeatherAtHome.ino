@@ -6,6 +6,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "wifi_conf.h"
+#include <ArduinoOTA.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -16,6 +17,7 @@ HTU21D sensor;
 
 // Wifi Signalstärke
 int32_t RSSI;
+const char* host = "WeatherAtHome1";
 
 // NTP
 WiFiUDP ntpUDP;
@@ -42,6 +44,41 @@ void setup() {
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
 
+
+  ArduinoOTA.setHostname(host);
+  ArduinoOTA.setPassword(OTA_PASS);
+  
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start updating");
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r\n", (progress / (total / 100)));
+  });
+
+  ArduinoOTA.onEnd([]() {
+    ESP.restart();
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("End Failed");
+    }
+    delay(3000);
+    ESP.restart();
+  });
+
+  ArduinoOTA.begin();
+
   timeClient.begin();
   timeClient.setTimeOffset(3600);
 
@@ -49,6 +86,7 @@ void setup() {
 }
 
 void loop() {
+  ArduinoOTA.handle();
   timeClient.update();
   readSensorData();
   renderDisplay();
@@ -112,7 +150,7 @@ void renderDisplay() {
 
   display.setTextColor(WHITE);
 
-  display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
+  // display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
      
   display.setTextSize(3);
   display.setCursor(0, (SCREEN_HEIGHT/2) - 10);
