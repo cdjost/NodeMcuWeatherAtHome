@@ -172,23 +172,23 @@ void renderDisplay() {
 
   display.dim(true);
 
-  display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
+  display.drawLine(0, 18, SCREEN_WIDTH, 18, WHITE);
 
   if (rssi > -65) {
-    display.fillRect(14,1,2,16,BLACK);
+    display.fillRect(14,1,2,16,WHITE);
   }
   if (rssi > -70) {
-    display.fillRect(10,5,2,12,BLACK);
+    display.fillRect(10,5,2,12,WHITE);
   }
   if (rssi > -78) {
-    display.fillRect(6,9,2,8,BLACK);
+    display.fillRect(6,9,2,8,WHITE);
   }
   if (rssi > -82) {
-    display.fillRect(2,13,2,4,BLACK);
+    display.fillRect(2,13,2,4,WHITE);
   }
 
   display.setTextSize(2); // Texthöhe 14 Pixel Breite 10?
-  display.setTextColor(BLACK);
+  display.setTextColor(WHITE);
 
   display.setCursor(65,2);
 
