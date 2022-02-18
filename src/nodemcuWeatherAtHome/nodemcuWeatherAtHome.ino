@@ -32,6 +32,11 @@ int ppm_uart = -1;
 
 unsigned long air_warn_start_time = 0;
 
+String currentTime = "00:00";
+int hour = 0;
+int minute = 0;
+int second = 0;
+
 MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
 void setup() {
@@ -96,6 +101,7 @@ void loop() {
   ArduinoOTA.handle();
   timeClient.update();
   readSensorData();
+  parseTime();
   renderDisplay();
   
   delay(5000);
@@ -131,7 +137,21 @@ void readSensorData() {
   }
 }
 
+void parseTime() {
+  currentTime = timeClient.getFormattedTime();
+  
+  char buffer[9];
+  currentTime.toCharArray(buffer, sizeof(buffer));
+
+  hour = atoi(strtok(buffer, ":"));
+  minute = atoi(strtok(NULL, ":"));
+  second = atoi(strtok(NULL, ":"));
+}
+
 void renderDisplay() {
+
+  if(hour > 6 && hour < 23)
+  {
 
   display.clearDisplay();
   display.dim(true);
@@ -155,7 +175,7 @@ void renderDisplay() {
   display.setTextColor(BLACK);
 
   display.setCursor(65,2);
-  String currentTime = timeClient.getFormattedTime();
+  
   display.print(currentTime.substring(0,5)); // Sekunden abschneiden
 
   display.setTextColor(WHITE);
@@ -202,4 +222,8 @@ void renderDisplay() {
   }
 
   display.display();
+  } else {
+    display.clearDisplay();
+    display.display();
+  }
 }
