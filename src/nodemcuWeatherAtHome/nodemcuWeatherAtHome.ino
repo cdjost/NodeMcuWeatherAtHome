@@ -16,7 +16,7 @@
 #define MH_Z19_TX D6  // D6
 
 const int SENSOR_READ_THRESHOLD = 30000;
-const bool DISABLE_DISPLAY_OFF = true;
+const bool DISABLE_DISPLAY_OFF = false;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
