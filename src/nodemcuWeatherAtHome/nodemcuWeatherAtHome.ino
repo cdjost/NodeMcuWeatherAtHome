@@ -20,11 +20,7 @@ HTU21D sensor;
 
 
 // Wifi Signalstärke
-<<<<<<< HEAD
-int32_t RSSI;
-=======
 int32_t rssi;
->>>>>>> 5d7566bc5c556314075cb9a2a25cdcb9905374d5
 
 // NTP
 WiFiUDP ntpUDP;
