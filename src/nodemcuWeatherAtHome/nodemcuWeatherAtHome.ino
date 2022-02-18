@@ -7,9 +7,13 @@
 #include <WiFiUdp.h>
 #include "config.h"
 #include <ArduinoOTA.h>
+#include <MHZ.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+#define MH_Z19_RX D7  // D7
+#define MH_Z19_TX D6  // D6
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
@@ -24,6 +28,15 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 float temperature = 100;
 float humidity = -100;
+int ppm_uart = -1;
+
+unsigned long air_warn_start_time = 0;
+
+bool isDelimiterShowing = true;  
+int hour = 0;
+int minute = 0;
+
+MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
 void setup() {
   Serial.begin(9600); /* begin serial for debug */
@@ -42,7 +55,6 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-
 
   ArduinoOTA.setHostname(HOST);
   ArduinoOTA.setPassword(OTA_PASS);
@@ -94,6 +106,7 @@ void loop() {
   ArduinoOTA.handle();
   timeClient.update();
   readSensorData();
+  parseTime();
   renderDisplay();
   
   delay(5000);
@@ -124,11 +137,26 @@ void readSensorData() {
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
   }
+  if(co2.isReady()){
+    ppm_uart = co2.readCO2UART();
+  }
+}
+
+void parseTime() {
+  hour = timeClient.getHours();
+  minute = timeClient.getMinutes();
 }
 
 void renderDisplay() {
+      display.clearDisplay();
 
-  display.clearDisplay();
+
+  // Turns the display off at night
+  if(hour < 6 && hour > 23){
+    display.display();
+    return;
+  }
+
   display.dim(true);
 
   display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
@@ -150,15 +178,22 @@ void renderDisplay() {
   display.setTextColor(BLACK);
 
   display.setCursor(65,2);
-  String currentTime = timeClient.getFormattedTime();
-  display.print(currentTime.substring(0,5)); // Sekunden abschneiden
+
+  char timeAnimation[5];
+  if(isDelimiterShowing) {
+    sprintf(timeAnimation, "%i:%i", hour, minute);
+  } else {
+    sprintf(timeAnimation, "%i %i", hour, minute);
+  }
+  isDelimiterShowing = !isDelimiterShowing;
+  display.print(timeAnimation);
 
   display.setTextColor(WHITE);
 
   // display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
      
   display.setTextSize(3);
-  display.setCursor(0, (SCREEN_HEIGHT/2) - 10);
+  display.setCursor(2, (SCREEN_HEIGHT/2) - 10);
     
   display.print(temperature);
   display.println(" C");
@@ -167,8 +202,34 @@ void renderDisplay() {
     
   display.setTextSize(1);
   display.setCursor(0, 55);
-  display.print("(%RH): ");
-  display.println(humidity);
+  display.printf("%.2f%%RH", humidity);
+  display.setCursor(80, 55);
+  if(ppm_uart < 0){
+    display.print("n/a ppm");
+  }
+  else{
+    display.printf("%dppm", ppm_uart);
+  }
+
+  if(humidity > 60 || ppm_uart > 1000){
+    if(air_warn_start_time == 0){
+      air_warn_start_time = millis();
+    }
+    // 30 Sekunden lang Warnung anzeigen danach 30 Sekunden lang Messwerte
+    if((millis() - air_warn_start_time) < 30000){
+      display.fillRect(0,50,SCREEN_WIDTH,14,WHITE);
+      display.setCursor(25, 55);
+      display.setTextColor(BLACK);
+      display.print("bitte Lueften");
+      display.setTextColor(WHITE);
+    }
+    else if((millis() - air_warn_start_time) > 60000){
+      air_warn_start_time = 0;
+    }
+  }
+  else{
+    air_warn_start_time = 0;
+  }
 
   display.display();
 }
