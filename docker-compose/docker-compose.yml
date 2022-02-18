@@ -1,0 +1,58 @@
+version: '3'
+services:
+  mosquitto:
+    image: 'eclipse-mosquitto:latest'
+    ports:
+      - '1883:1883'
+    volumes:
+     - './data/mosquitto/config/:/mosquitto/config/'
+
+  influxdb:
+    image: 'influxdb:1.8'
+    ports:
+      - '8086:8086'
+    volumes:
+      - 'vol_influxdb:/var/lib/influxdb'
+    environment:
+      - INFLUXDB_DB=telegraf
+      - INFLUXDB_ADMIN_USER=${InfluxAdminUser}
+      - INFLUXDB_ADMIN_PASSWORD=${InfluxAdminPassword}
+
+  telegraf:
+    image: 'telegraf:latest'
+    volumes:
+      - './data/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf'
+    environment:
+      - INFLUXDB_ADMIN_USER=${InfluxAdminUser}
+      - INFLUXDB_ADMIN_PASSWORD=${InfluxAdminPassword}
+    depends_on:
+      - influxdb
+
+  grafana:
+    image: 'grafana/grafana:latest'
+    ports:
+      - '3000:3000'
+    volumes:
+      - './data/grafana/grafana.ini:/etc/grafana/grafana.ini'
+      - 'vol_grafana_var:/var/lib/grafana'
+      - 'vol_grafana_etc:/etc/grafana/'
+    depends_on:
+      - influxdb
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GrafanaAdminUser}
+      - GF_SECURITY_ADMIN_PASSWORD=${GrafanaAdminPassword}
+
+  iobroker:
+    image: 'buanet/iobroker:latest'
+    ports:
+      - '8081:8081'
+      - '8082:8082'
+    volumes:
+      - 'vol_iobroker:/opt/iobroker'
+
+volumes:
+  vol_influxdb:
+  vol_telegraf:
+  vol_grafana_var:
+  vol_grafana_etc:
+  vol_iobroker:
