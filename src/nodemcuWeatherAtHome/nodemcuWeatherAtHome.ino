@@ -16,9 +16,12 @@
 #define MH_Z19_TX D6  // D6
 
 const int SENSOR_READ_THRESHOLD = 30000;
-const bool DISABLE_DISPLAY_OFF = false;
+const int RSSI_READ_THRESHOLD = 3000;
+const bool DISABLE_DISPLAY_OFF = true;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+bool isDisplayOn = false;
+
 HTU21D sensor;
 
 
@@ -35,6 +38,7 @@ int ppm_uart = -1;
 
 unsigned long air_warn_start_time = 0;
 unsigned long lastSensorRead = millis();
+unsigned long lastRSSIRead = millis();
 
 bool isDelimiterShowing = true;  
 int hour = 0;
@@ -47,6 +51,7 @@ void setup() {
   Wire.begin(D1, D2); /* join i2c bus with SDA=D1 and SCL=D2 of NodeMCU */
 
   initDisplay();
+  isDisplayOn = true;
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to Wifi Network");
@@ -113,6 +118,11 @@ void loop() {
   ArduinoOTA.handle();
   timeClient.update();
 
+  if(millis() - lastRSSIRead > RSSI_READ_THRESHOLD) {
+    rssi = WiFi.RSSI();
+    lastRSSIRead = millis();
+  }
+
   if(millis() - lastSensorRead > SENSOR_READ_THRESHOLD ){
   readSensorData();
   lastSensorRead = millis();
@@ -145,7 +155,6 @@ void initDisplay() {
 }
 
 void readSensorData() {
-  rssi = WiFi.RSSI();
   if(sensor.measure()){
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
@@ -166,8 +175,15 @@ void renderDisplay() {
 
   // Turns the display off at night
   if((hour < 6 || hour >= 23) && !DISABLE_DISPLAY_OFF){
-    display.display();
+    if(isDisplayOn) {
+      display.ssd1306_command(SSD1306_DISPLAYOFF);
+      isDisplayOn = false;
+    }
     return;
+  }
+  else if(!isDisplayOn) {
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    isDisplayOn = true;
   }
 
   display.dim(true);
