@@ -15,8 +15,8 @@
 #define MH_Z19_RX D7  // D7
 #define MH_Z19_TX D6  // D6
 
-const int SENSOR_READ_THRESHOLD = 3000;
-const bool DISABLE_DISPLAY_OFF = false;
+const int SENSOR_READ_THRESHOLD = 30000;
+const bool DISABLE_DISPLAY_OFF = true;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
@@ -104,6 +104,9 @@ void setup() {
   timeClient.setTimeOffset(3600);
 
   sensor.begin();
+
+  // Initial sensor read
+  readSensorData();
 }
 
 void loop() {
