@@ -32,10 +32,9 @@ int ppm_uart = -1;
 
 unsigned long air_warn_start_time = 0;
 
-String currentTime = "00:00";
+bool isDelimiterShowing = true;  
 int hour = 0;
 int minute = 0;
-int second = 0;
 
 MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
@@ -138,20 +137,17 @@ void readSensorData() {
 }
 
 void parseTime() {
-  currentTime = timeClient.getFormattedTime();
-  
-  char buffer[9];
-  currentTime.toCharArray(buffer, sizeof(buffer));
-
-  hour = atoi(strtok(buffer, ":"));
-  minute = atoi(strtok(NULL, ":"));
-  second = atoi(strtok(NULL, ":"));
+  hour = timeClient.getHours();
+  minute = timeClient.getMinutes();
 }
 
 void renderDisplay() {
 
-  if(hour > 6 && hour < 23)
-  {
+  if(hour < 6 && hour > 23){
+    display.clearDisplay();
+    display.display();
+    return;
+  }
 
   display.clearDisplay();
   display.dim(true);
@@ -175,8 +171,15 @@ void renderDisplay() {
   display.setTextColor(BLACK);
 
   display.setCursor(65,2);
-  
-  display.print(currentTime.substring(0,5)); // Sekunden abschneiden
+
+  char timeAnimation[5];
+  if(isDelimiterShowing) {
+    sprintf(timeAnimation, "%i:%i", hour, minute);
+  } else {
+    sprintf(timeAnimation, "%i %i", hour, minute);
+  }
+  isDelimiterShowing = !isDelimiterShowing;
+  display.print(timeAnimation);
 
   display.setTextColor(WHITE);
 
@@ -222,8 +225,4 @@ void renderDisplay() {
   }
 
   display.display();
-  } else {
-    display.clearDisplay();
-    display.display();
-  }
 }
