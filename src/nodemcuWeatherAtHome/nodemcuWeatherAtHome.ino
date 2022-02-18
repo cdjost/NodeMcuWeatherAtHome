@@ -15,6 +15,9 @@
 #define MH_Z19_RX D7  // D7
 #define MH_Z19_TX D6  // D6
 
+const int SENSOR_READ_THRESHOLD = 3000;
+const bool DISABLE_DISPLAY_OFF = false;
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
 
@@ -31,6 +34,7 @@ float humidity = -100;
 int ppm_uart = -1;
 
 unsigned long air_warn_start_time = 0;
+unsigned long lastSensorRead = millis();
 
 bool isDelimiterShowing = true;  
 int hour = 0;
@@ -105,11 +109,17 @@ void setup() {
 void loop() {
   ArduinoOTA.handle();
   timeClient.update();
+
+  if(millis() - lastSensorRead > SENSOR_READ_THRESHOLD ){
   readSensorData();
+  lastSensorRead = millis();
+  }
+  
+  
   parseTime();
   renderDisplay();
   
-  delay(5000);
+  delay(1000);
 }
 
 void initDisplay() {
@@ -148,11 +158,11 @@ void parseTime() {
 }
 
 void renderDisplay() {
-      display.clearDisplay();
+   display.clearDisplay();
 
 
   // Turns the display off at night
-  if(hour < 6 && hour > 23){
+  if((hour < 6 || hour >= 23) && !DISABLE_DISPLAY_OFF){
     display.display();
     return;
   }
@@ -181,9 +191,9 @@ void renderDisplay() {
 
   char timeAnimation[5];
   if(isDelimiterShowing) {
-    sprintf(timeAnimation, "%i:%i", hour, minute);
+    sprintf(timeAnimation, "%02d:%02d", hour, minute);
   } else {
-    sprintf(timeAnimation, "%i %i", hour, minute);
+    sprintf(timeAnimation, "%02d %02d", hour, minute);
   }
   isDelimiterShowing = !isDelimiterShowing;
   display.print(timeAnimation);
