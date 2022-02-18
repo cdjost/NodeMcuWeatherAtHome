@@ -142,14 +142,15 @@ void parseTime() {
 }
 
 void renderDisplay() {
+      display.clearDisplay();
 
+
+  // Turns the display off at night
   if(hour < 6 && hour > 23){
-    display.clearDisplay();
     display.display();
     return;
   }
 
-  display.clearDisplay();
   display.dim(true);
 
   display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
