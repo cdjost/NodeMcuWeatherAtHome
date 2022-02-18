@@ -17,7 +17,7 @@
 
 const int SENSOR_READ_THRESHOLD = 30000;
 const int RSSI_READ_THRESHOLD = 3000;
-const bool DISABLE_DISPLAY_OFF = true;
+const bool DISABLE_DISPLAY_OFF = false;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 bool isDisplayOn = false;
@@ -222,7 +222,7 @@ void renderDisplay() {
   // display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
      
   display.setTextSize(3);
-  display.setCursor(2, (SCREEN_HEIGHT/2) - 10);
+  display.setCursor(2, (SCREEN_HEIGHT/2) - 8);
     
   display.print(temperature);
   display.println(" C");
