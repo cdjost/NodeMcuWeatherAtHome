@@ -1,7 +1,12 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <ESP8266WiFi.h>
 #include <HTU21D.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include "config.h"
+#include <ArduinoOTA.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -9,19 +14,85 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 HTU21D sensor;
 
+
+// Wifi Signalstärke
+int32_t rssi;
+
+// NTP
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
+
 float temperature = 100;
 float humidity = -100;
 
 void setup() {
- Serial.begin(9600); /* begin serial for debug */
- Wire.begin(D1, D2); /* join i2c bus with SDA=D1 and SCL=D2 of NodeMCU */
+  Serial.begin(9600); /* begin serial for debug */
+  Wire.begin(D1, D2); /* join i2c bus with SDA=D1 and SCL=D2 of NodeMCU */
 
- initDisplay();
+  initDisplay();
+
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Connecting to Wifi Network");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  Serial.print("Connected, IP address: ");
+  Serial.println(WiFi.localIP());
+
+
+  ArduinoOTA.setHostname(HOST);
+  ArduinoOTA.setPassword(OTA_PASS);
+  
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start updating");
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r\n", (progress / (total / 100)));
+  });
+
+  ArduinoOTA.onEnd([]() {
+    ESP.restart();
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    switch(error) {
+      case OTA_AUTH_ERROR:
+        Serial.println("Auth Failed");
+        break;
+      case OTA_BEGIN_ERROR:
+        Serial.println("Begin Failed");
+        break;
+      case OTA_CONNECT_ERROR:
+        Serial.println("Connect Failed");
+        break;
+      case OTA_RECEIVE_ERROR:
+        Serial.println("Receive Failed");
+        break;
+      case OTA_END_ERROR:
+        Serial.println("End Failed");
+    }
+    
+    delay(3000);
+    ESP.restart();
+  });
+
+  ArduinoOTA.begin();
+
+  timeClient.begin();
+  timeClient.setTimeOffset(3600);
 
   sensor.begin();
 }
 
 void loop() {
+  ArduinoOTA.handle();
+  timeClient.update();
   readSensorData();
   renderDisplay();
   
@@ -33,11 +104,12 @@ void initDisplay() {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
+
   
   delay(2000);
   
   display.clearDisplay();
-
+  
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setTextSize(3);
@@ -47,6 +119,7 @@ void initDisplay() {
 }
 
 void readSensorData() {
+  rssi = WiFi.RSSI();
   if(sensor.measure()){
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
@@ -58,7 +131,31 @@ void renderDisplay() {
   display.clearDisplay();
   display.dim(true);
 
-  display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
+  display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
+
+  if (rssi > -65) {
+    display.fillRect(14,1,2,16,BLACK);
+  }
+  if (rssi > -70) {
+    display.fillRect(10,5,2,12,BLACK);
+  }
+  if (rssi > -78) {
+    display.fillRect(6,9,2,8,BLACK);
+  }
+  if (rssi > -82) {
+    display.fillRect(2,13,2,4,BLACK);
+  }
+
+  display.setTextSize(2); // Texthöhe 14 Pixel Breite 10?
+  display.setTextColor(BLACK);
+
+  display.setCursor(65,2);
+  String currentTime = timeClient.getFormattedTime();
+  display.print(currentTime.substring(0,5)); // Sekunden abschneiden
+
+  display.setTextColor(WHITE);
+
+  // display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
      
   display.setTextSize(3);
   display.setCursor(0, (SCREEN_HEIGHT/2) - 10);
