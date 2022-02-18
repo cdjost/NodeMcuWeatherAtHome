@@ -36,6 +36,10 @@ int ppm_uart = -1;
 
 unsigned long air_warn_start_time = 0;
 
+bool isDelimiterShowing = true;  
+int hour = 0;
+int minute = 0;
+
 MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
 void setup() {
@@ -106,6 +110,7 @@ void loop() {
   ArduinoOTA.handle();
   timeClient.update();
   readSensorData();
+  parseTime();
   renderDisplay();
   
   delay(5000);
@@ -141,9 +146,21 @@ void readSensorData() {
   }
 }
 
-void renderDisplay() {
+void parseTime() {
+  hour = timeClient.getHours();
+  minute = timeClient.getMinutes();
+}
 
-  display.clearDisplay();
+void renderDisplay() {
+      display.clearDisplay();
+
+
+  // Turns the display off at night
+  if(hour < 6 && hour > 23){
+    display.display();
+    return;
+  }
+
   display.dim(true);
 
   display.fillRect(0,0,128,18,WHITE); // x, y, w, z | x,y Startposition von oben links w breite horzontal, z höhe vertikal
@@ -165,8 +182,15 @@ void renderDisplay() {
   display.setTextColor(BLACK);
 
   display.setCursor(65,2);
-  String currentTime = timeClient.getFormattedTime();
-  display.print(currentTime.substring(0,5)); // Sekunden abschneiden
+
+  char timeAnimation[5];
+  if(isDelimiterShowing) {
+    sprintf(timeAnimation, "%i:%i", hour, minute);
+  } else {
+    sprintf(timeAnimation, "%i %i", hour, minute);
+  }
+  isDelimiterShowing = !isDelimiterShowing;
+  display.print(timeAnimation);
 
   display.setTextColor(WHITE);
 
