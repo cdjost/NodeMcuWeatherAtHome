@@ -208,7 +208,7 @@ void renderDisplay() {
 
   display.setCursor(65,2);
 
-  char timeAnimation[5];
+  char timeAnimation[6];
   if(isDelimiterShowing) {
     sprintf(timeAnimation, "%02d:%02d", hour, minute);
   } else {
