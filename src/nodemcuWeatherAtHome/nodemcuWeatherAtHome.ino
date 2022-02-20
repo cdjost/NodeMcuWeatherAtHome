@@ -76,6 +76,7 @@ void setup() {
   
   ArduinoOTA.onStart([]() {
     Serial.println("Start updating");
+    mqttClient.disconnect();
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -119,8 +120,19 @@ void setup() {
   mqttClient.setClient(mqttWiFiClient);
   mqttClient.setServer(MQTT_HOST, 1883);
 
+  connectMQTT();
+
   // Initial sensor read
   readSensorData();
+}
+
+void connectMQTT(){
+  if(mqttClient.connect(HOST, MQTT_USER, MQTT_PW)){
+    Serial.println("MQTT connected");
+  }
+  else{
+    Serial.println("Error connecting to MQTT broker");
+  }
 }
 
 void loop() {
@@ -157,15 +169,21 @@ void publishData(){
   doc["co2"] = ppm_uart;
 
   serializeJson(doc, jsonPayload);
-  
-  Serial.println("Sending MQTT Message...");
-  if(mqttClient.connect(HOST, MQTT_USER, MQTT_PW, MQTT_TOPIC, 2, true, jsonPayload)){
-    Serial.println("MQTT Message successfully sent");
+
+  if(mqttClient.state() == 0){
+    Serial.println("Sending MQTT Message...");
+    if(mqttClient.publish(MQTT_TOPIC, jsonPayload)){
+      Serial.println("MQTT Message successfully sent");
+    }
+    else{
+      Serial.println("Error sending MQTT Message");
+      Serial.print("Client state: ");
+      Serial.print(mqttClient.state());
+      Serial.println();
+      mqttClient.disconnect();
+      connectMQTT();
+    }
   }
-  else{
-    Serial.println("Error sending MQTT Message");
-  }
-  mqttClient.disconnect();
 }
 
 void initDisplay() {
