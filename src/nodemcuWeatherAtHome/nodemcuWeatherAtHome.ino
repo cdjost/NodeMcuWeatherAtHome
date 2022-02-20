@@ -8,6 +8,7 @@
 #include "config.h"
 #include <ArduinoOTA.h>
 #include <MHZ.h>
+#include <PubSubClient.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -31,6 +32,10 @@ int32_t rssi;
 // NTP
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
+
+// MQTT
+WiFiClient mqttWiFiClient;
+PubSubClient mqttClient;
 
 float temperature = 100;
 float humidity = -100;
@@ -109,6 +114,9 @@ void setup() {
   timeClient.setTimeOffset(3600);
 
   sensor.begin();
+
+  mqttClient.setClient(mqttWiFiClient);
+  mqttClient.setServer(MQTT_HOST, 1883);
 
   // Initial sensor read
   readSensorData();
