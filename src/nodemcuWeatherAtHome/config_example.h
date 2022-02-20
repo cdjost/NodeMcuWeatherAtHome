@@ -5,4 +5,4 @@
 #define MQTT_HOST ""
 #define MQTT_USER ""
 #define MQTT_PW ""
-define MQTT_TOPIC ""
+#define MQTT_TOPIC ""
