@@ -2,3 +2,7 @@
 #define WIFI_PASS ""
 #define OTA_PASS ""
 #define HOST ""
+#define MQTT_HOST ""
+#define MQTT_USER ""
+#define MQTT_PW ""
+define MQTT_TOPIC ""

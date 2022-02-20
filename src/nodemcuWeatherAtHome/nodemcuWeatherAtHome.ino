@@ -9,6 +9,7 @@
 #include <ArduinoOTA.h>
 #include <MHZ.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -133,14 +134,38 @@ void loop() {
 
   if(millis() - lastSensorRead > SENSOR_READ_THRESHOLD ){
   readSensorData();
+  publishData();
   lastSensorRead = millis();
   }
-  
   
   parseTime();
   renderDisplay();
   
   delay(1000);
+}
+
+void publishData(){
+  if(ppm_uart < 0){
+    return;
+  }
+  
+  StaticJsonDocument<200> doc;
+  char jsonPayload[200];
+  doc["id"] = HOST;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  doc["co2"] = ppm_uart;
+
+  serializeJson(doc, jsonPayload);
+  
+  Serial.println("Sending MQTT Message...");
+  if(mqttClient.connect(HOST, MQTT_USER, MQTT_PW, MQTT_TOPIC, 2, true, jsonPayload)){
+    Serial.println("MQTT Message successfully sent");
+  }
+  else{
+    Serial.println("Error sending MQTT Message");
+  }
+  mqttClient.disconnect();
 }
 
 void initDisplay() {
