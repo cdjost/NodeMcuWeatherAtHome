@@ -58,7 +58,8 @@ void setup() {
 
   initDisplay();
   isDisplayOn = true;
-
+  
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to Wifi Network");
   while (WiFi.status() != WL_CONNECTED)
@@ -66,7 +67,8 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println();
+
+  randomSeed(micros());
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
@@ -170,20 +172,11 @@ void publishData(){
 
   serializeJson(doc, jsonPayload);
 
-  if(mqttClient.state() == 0){
-    Serial.println("Sending MQTT Message...");
-    if(mqttClient.publish(MQTT_TOPIC, jsonPayload)){
-      Serial.println("MQTT Message successfully sent");
-    }
-    else{
-      Serial.println("Error sending MQTT Message");
-      Serial.print("Client state: ");
-      Serial.print(mqttClient.state());
-      Serial.println();
-      mqttClient.disconnect();
-      connectMQTT();
-    }
+  if (!mqttClient.connected()) {
+    connectMQTT();
   }
+
+  mqttClient.publish(MQTT_TOPIC, jsonPayload);
 }
 
 void initDisplay() {
