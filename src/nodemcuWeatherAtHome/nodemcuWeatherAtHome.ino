@@ -7,7 +7,9 @@
 #include <WiFiUdp.h>
 #include "config.h"
 #include <ArduinoOTA.h>
+#if ENABLE_CO2
 #include <MHZ.h>
+#endif
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
@@ -50,7 +52,9 @@ bool isDelimiterShowing = true;
 int hour = 0;
 int minute = 0;
 
+#if ENABLE_CO2
 MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
+#endif
 
 void setup() {
   Serial.begin(9600); /* begin serial for debug */
@@ -162,16 +166,20 @@ void loop() {
 }
 
 void publishData(){
+  #if ENABLE_CO2
   if(ppm_uart < 0){
     return;
   }
+  #endif
   
   StaticJsonDocument<200> doc;
   char jsonPayload[200];
   doc["id"] = HOST;
   doc["temperature"] = temperature;
   doc["humidity"] = humidity;
+  #if ENABLE_CO2
   doc["co2"] = ppm_uart;
+  #endif
 
   serializeJson(doc, jsonPayload);
 
@@ -206,9 +214,12 @@ void readSensorData() {
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
   }
+
+  #if ENABLE_CO2
   if(co2.isReady()){
     ppm_uart = co2.readCO2UART();
   }
+  #endif
 }
 
 void getCurrentTime() {
@@ -280,12 +291,15 @@ void renderDisplay() {
   display.setCursor(0, 55);
   display.printf("%.2f%%RH", humidity);
   display.setCursor(80, 55);
+
+  #if ENABLE_CO2
   if(ppm_uart < 0){
     display.print("n/a ppm");
   }
   else{
     display.printf("%dppm", ppm_uart);
   }
+  #endif
 
   if(humidity > 60 || ppm_uart > 1000){
     if(air_warn_start_time == 0){

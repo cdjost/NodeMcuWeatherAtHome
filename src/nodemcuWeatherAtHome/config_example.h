@@ -7,3 +7,4 @@
 #define MQTT_USER ""
 #define MQTT_PW ""
 #define MQTT_TOPIC ""
+#define ENABLE_CO2 true
