@@ -8,3 +8,4 @@
 #define MQTT_PW ""
 #define MQTT_TOPIC ""
 #define ENABLE_CO2 true
+#define ENABLE_AIR_WARNING true

@@ -42,6 +42,7 @@ PubSubClient mqttClient(wifiClient);
 
 float temperature = 100;
 float humidity = -100;
+int ppm_uart = -1;
 
 unsigned long air_warn_start_time = 0;
 unsigned long lastSensorRead = millis();
@@ -53,7 +54,6 @@ int minute = 0;
 
 #if ENABLE_CO2
 MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
-int ppm_uart = -1;
 #endif
 
 void setup() {
@@ -304,6 +304,7 @@ void renderDisplay() {
   }
   #endif
 
+  #if ENABLE_AIR_WARNING
   if(humidity > 60 || ppm_uart > 1000){
     if(air_warn_start_time == 0){
       air_warn_start_time = millis();
@@ -323,6 +324,7 @@ void renderDisplay() {
   else{
     air_warn_start_time = 0;
   }
+  #endif
 
   display.display();
 }
