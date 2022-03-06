@@ -8,6 +8,8 @@
 #include "config.h"
 #include <ArduinoOTA.h>
 #include <MHZ.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -32,6 +34,10 @@ int32_t rssi;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
+// MQTT
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+
 float temperature = 100;
 float humidity = -100;
 int ppm_uart = -1;
@@ -49,10 +55,27 @@ MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 void setup() {
   Serial.begin(9600); /* begin serial for debug */
   Wire.begin(D1, D2); /* join i2c bus with SDA=D1 and SCL=D2 of NodeMCU */
-
+  
   initDisplay();
   isDisplayOn = true;
 
+  setupWiFi();
+  setupOTA();
+
+  mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+  connectMQTT();
+
+  timeClient.begin();
+  timeClient.setTimeOffset(3600);
+  
+  sensor.begin();
+
+  // Initial sensor read
+  readSensorData();
+}
+
+void setupWiFi(){
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to Wifi Network");
   while (WiFi.status() != WL_CONNECTED)
@@ -60,16 +83,18 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println();
-
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
+  WiFi.setAutoReconnect(true);
+}
 
+void setupOTA(){
   ArduinoOTA.setHostname(HOST);
   ArduinoOTA.setPassword(OTA_PASS);
   
   ArduinoOTA.onStart([]() {
     Serial.println("Start updating");
+    mqttClient.disconnect();
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -102,16 +127,17 @@ void setup() {
     delay(3000);
     ESP.restart();
   });
-
+  
   ArduinoOTA.begin();
+}
 
-  timeClient.begin();
-  timeClient.setTimeOffset(3600);
-
-  sensor.begin();
-
-  // Initial sensor read
-  readSensorData();
+void connectMQTT(){
+  if(mqttClient.connect(HOST, MQTT_USER, MQTT_PW)){
+    // Serial.println("MQTT connected");
+  }
+  else{
+    Serial.println("Error connecting to MQTT broker");
+  }
 }
 
 void loop() {
@@ -125,14 +151,35 @@ void loop() {
 
   if(millis() - lastSensorRead > SENSOR_READ_THRESHOLD ){
   readSensorData();
+  publishData();
   lastSensorRead = millis();
   }
   
-  
-  parseTime();
+  getCurrentTime();
   renderDisplay();
   
   delay(1000);
+}
+
+void publishData(){
+  if(ppm_uart < 0){
+    return;
+  }
+  
+  StaticJsonDocument<200> doc;
+  char jsonPayload[200];
+  doc["id"] = HOST;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  doc["co2"] = ppm_uart;
+
+  serializeJson(doc, jsonPayload);
+
+  if (!mqttClient.connected()) {
+    connectMQTT();
+  }
+
+  mqttClient.publish(MQTT_TOPIC, jsonPayload);
 }
 
 void initDisplay() {
@@ -164,7 +211,7 @@ void readSensorData() {
   }
 }
 
-void parseTime() {
+void getCurrentTime() {
   hour = timeClient.getHours();
   minute = timeClient.getMinutes();
 }
