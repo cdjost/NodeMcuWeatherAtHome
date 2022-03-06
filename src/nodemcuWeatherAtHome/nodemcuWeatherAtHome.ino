@@ -133,7 +133,7 @@ void setupOTA(){
 
 void connectMQTT(){
   if(mqttClient.connect(HOST, MQTT_USER, MQTT_PW)){
-    Serial.println("MQTT connected");
+    // Serial.println("MQTT connected");
   }
   else{
     Serial.println("Error connecting to MQTT broker");
