@@ -7,11 +7,15 @@
 #include <WiFiUdp.h>
 #include "config.h"
 #include <ArduinoOTA.h>
+
 #if ENABLE_CO2
 #include <MHZ.h>
 #endif
+
+#if ENABLE_MQTT
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#endif
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -36,9 +40,11 @@ int32_t rssi;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
-// MQTT
 WiFiClient wifiClient;
+
+#if ENABLE_MQTT
 PubSubClient mqttClient(wifiClient);
+#endif
 
 float temperature = 100;
 float humidity = -100;
@@ -48,7 +54,7 @@ unsigned long air_warn_start_time = 0;
 unsigned long lastSensorRead = millis();
 unsigned long lastRSSIRead = millis();
 
-bool isDelimiterShowing = true;  
+bool isDelimiterShowing = true;
 int hour = 0;
 int minute = 0;
 
@@ -59,27 +65,30 @@ MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 void setup() {
   Serial.begin(9600); /* begin serial for debug */
   Wire.begin(D1, D2); /* join i2c bus with SDA=D1 and SCL=D2 of NodeMCU */
-  
+
   initDisplay();
   isDisplayOn = true;
 
   setupWiFi();
   setupOTA();
 
+#if ENABLE_MQTT
   mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
   connectMQTT();
+#endif
 
   timeClient.begin();
   timeClient.setTimeOffset(3600);
-  
+
   sensor.begin();
 
   // Initial sensor read
   readSensorData();
 }
 
-void setupWiFi(){
+void setupWiFi() {
   WiFi.mode(WIFI_STA);
+  WiFi.hostname(HOST);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to Wifi Network");
   while (WiFi.status() != WL_CONNECTED)
@@ -93,13 +102,15 @@ void setupWiFi(){
   WiFi.persistent(true);
 }
 
-void setupOTA(){
+void setupOTA() {
   ArduinoOTA.setHostname(HOST);
   ArduinoOTA.setPassword(OTA_PASS);
-  
+
   ArduinoOTA.onStart([]() {
     Serial.println("Start updating");
+    #if ENABLE_MQTT
     mqttClient.disconnect();
+    #endif
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -112,7 +123,7 @@ void setupOTA(){
 
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("Error[%u]: ", error);
-    switch(error) {
+    switch (error) {
       case OTA_AUTH_ERROR:
         Serial.println("Auth Failed");
         break;
@@ -128,59 +139,64 @@ void setupOTA(){
       case OTA_END_ERROR:
         Serial.println("End Failed");
     }
-    
+
     delay(3000);
     ESP.restart();
   });
-  
+
   ArduinoOTA.begin();
 }
 
-void connectMQTT(){
-  if(mqttClient.connect(HOST, MQTT_USER, MQTT_PW)){
+#if ENABLE_MQTT
+void connectMQTT() {
+  if (mqttClient.connect(HOST, MQTT_USER, MQTT_PW)) {
     // Serial.println("MQTT connected");
   }
-  else{
+  else {
     Serial.println("Error connecting to MQTT broker");
   }
 }
+#endif
 
 void loop() {
   ArduinoOTA.handle();
   timeClient.update();
 
-  if(millis() - lastRSSIRead > RSSI_READ_THRESHOLD) {
+  if (millis() - lastRSSIRead > RSSI_READ_THRESHOLD) {
     rssi = WiFi.RSSI();
     lastRSSIRead = millis();
   }
 
-  if(millis() - lastSensorRead > SENSOR_READ_THRESHOLD ){
-  readSensorData();
-  publishData();
-  lastSensorRead = millis();
+  if (millis() - lastSensorRead > SENSOR_READ_THRESHOLD ) {
+    readSensorData();
+#if ENABLE_MQTT
+    publishData();
+#endif
+    lastSensorRead = millis();
   }
-  
+
   getCurrentTime();
   renderDisplay();
-  
+
   delay(1000);
 }
 
-void publishData(){
-  #if ENABLE_CO2
-  if(ppm_uart < 0){
+#if ENABLE_MQTT
+void publishData() {
+#if ENABLE_CO2
+  if (ppm_uart < 0) {
     return;
   }
-  #endif
-  
+#endif
+
   StaticJsonDocument<200> doc;
   char jsonPayload[200];
   doc["id"] = HOST;
   doc["temperature"] = temperature;
   doc["humidity"] = humidity;
-  #if ENABLE_CO2
+#if ENABLE_CO2
   doc["co2"] = ppm_uart;
-  #endif
+#endif
 
   serializeJson(doc, jsonPayload);
 
@@ -190,37 +206,38 @@ void publishData(){
 
   mqttClient.publish(MQTT_TOPIC, jsonPayload);
 }
+#endif
 
 void initDisplay() {
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
+    for (;;);
   }
 
-  
+
   delay(2000);
-  
+
   display.clearDisplay();
-  
+
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setTextSize(3);
-  display.setCursor(0, (SCREEN_HEIGHT/2) - 10);
+  display.setCursor(0, (SCREEN_HEIGHT / 2) - 10);
   display.println("Loading...");
   display.display();
 }
 
 void readSensorData() {
-  if(sensor.measure()){
+  if (sensor.measure()) {
     temperature = sensor.getTemperature();
     humidity = sensor.getHumidity();
   }
 
-  #if ENABLE_CO2
-  if(co2.isReady()){
+#if ENABLE_CO2
+  if (co2.isReady()) {
     ppm_uart = co2.readCO2UART();
   }
-  #endif
+#endif
 }
 
 void getCurrentTime() {
@@ -229,18 +246,18 @@ void getCurrentTime() {
 }
 
 void renderDisplay() {
-   display.clearDisplay();
+  display.clearDisplay();
 
 
   // Turns the display off at night
-  if((hour < 6 || hour >= 23) && !DISABLE_DISPLAY_OFF){
-    if(isDisplayOn) {
+  if ((hour < 6 || hour >= 23) && !DISABLE_DISPLAY_OFF) {
+    if (isDisplayOn) {
       display.ssd1306_command(SSD1306_DISPLAYOFF);
       isDisplayOn = false;
     }
     return;
   }
-  else if(!isDisplayOn) {
+  else if (!isDisplayOn) {
     display.ssd1306_command(SSD1306_DISPLAYON);
     isDisplayOn = true;
   }
@@ -249,28 +266,28 @@ void renderDisplay() {
 
   display.drawLine(0, 18, SCREEN_WIDTH, 18, WHITE);
 
-  if(WiFi.status() == WL_CONNECTED){
+  if (WiFi.status() == WL_CONNECTED) {
     if (rssi > -65) {
-      display.fillRect(14,1,2,16,WHITE);
+      display.fillRect(14, 1, 2, 16, WHITE);
     }
     if (rssi > -70) {
-      display.fillRect(10,5,2,12,WHITE);
+      display.fillRect(10, 5, 2, 12, WHITE);
     }
     if (rssi > -78) {
-      display.fillRect(6,9,2,8,WHITE);
+      display.fillRect(6, 9, 2, 8, WHITE);
     }
     if (rssi > -82) {
-      display.fillRect(2,13,2,4,WHITE);
+      display.fillRect(2, 13, 2, 4, WHITE);
     }
   }
 
   display.setTextSize(2); // Texthöhe 14 Pixel Breite 10?
   display.setTextColor(WHITE);
 
-  display.setCursor(65,2);
+  display.setCursor(65, 2);
 
   char timeAnimation[6];
-  if(isDelimiterShowing) {
+  if (isDelimiterShowing) {
     sprintf(timeAnimation, "%02d:%02d", hour, minute);
   } else {
     sprintf(timeAnimation, "%02d %02d", hour, minute);
@@ -281,50 +298,50 @@ void renderDisplay() {
   display.setTextColor(WHITE);
 
   // display.drawLine(0, 14, SCREEN_WIDTH, 14, WHITE);
-     
+
   display.setTextSize(3);
-  display.setCursor(2, (SCREEN_HEIGHT/2) - 8);
-    
+  display.setCursor(2, (SCREEN_HEIGHT / 2) - 8);
+
   display.print(temperature);
   display.println(" C");
 
   display.drawLine(0, 50, SCREEN_WIDTH, 50, WHITE);
-    
+
   display.setTextSize(1);
   display.setCursor(0, 55);
   display.printf("%.2f%%RH", humidity);
   display.setCursor(80, 55);
 
-  #if ENABLE_CO2
-  if(ppm_uart < 0){
+#if ENABLE_CO2
+  if (ppm_uart < 0) {
     display.print("n/a ppm");
   }
-  else{
+  else {
     display.printf("%dppm", ppm_uart);
   }
-  #endif
+#endif
 
-  #if ENABLE_AIR_WARNING
-  if(humidity > 60 || ppm_uart > 1000){
-    if(air_warn_start_time == 0){
+#if ENABLE_AIR_WARNING
+  if (humidity > 60 || ppm_uart > 1000) {
+    if (air_warn_start_time == 0) {
       air_warn_start_time = millis();
     }
     // 30 Sekunden lang Warnung anzeigen danach 30 Sekunden lang Messwerte
-    if((millis() - air_warn_start_time) < 30000){
-      display.fillRect(0,50,SCREEN_WIDTH,14,WHITE);
+    if ((millis() - air_warn_start_time) < 30000) {
+      display.fillRect(0, 50, SCREEN_WIDTH, 14, WHITE);
       display.setCursor(25, 55);
       display.setTextColor(BLACK);
       display.print("bitte Lueften");
       display.setTextColor(WHITE);
     }
-    else if((millis() - air_warn_start_time) > 60000){
+    else if ((millis() - air_warn_start_time) > 60000) {
       air_warn_start_time = 0;
     }
   }
-  else{
+  else {
     air_warn_start_time = 0;
   }
-  #endif
+#endif
 
   display.display();
 }
