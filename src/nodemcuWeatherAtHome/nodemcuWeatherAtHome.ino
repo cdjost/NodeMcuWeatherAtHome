@@ -8,6 +8,10 @@
 #include "config.h"
 #include <ArduinoOTA.h>
 
+#if ENABLE_PRESSURE
+#include <Adafruit_BMP280.h>
+#endif
+
 #if ENABLE_CO2
 #include <MHZ.h>
 #endif
@@ -40,6 +44,10 @@ int32_t rssi;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
+#if ENABLE_PRESSURE
+Adafruit_BMP280 bmp;
+#endif
+
 WiFiClient wifiClient;
 
 #if ENABLE_MQTT
@@ -49,6 +57,7 @@ PubSubClient mqttClient(wifiClient);
 float temperature = 100;
 float humidity = -100;
 int ppm_uart = -1;
+float pressure = -1;
 
 unsigned long air_warn_start_time = 0;
 unsigned long lastSensorRead = millis();
@@ -75,6 +84,28 @@ void setup() {
 #if ENABLE_MQTT
   mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
   connectMQTT();
+#endif
+
+#if ENABLE_PRESSURE
+  unsigned status;
+  status = bmp.begin();
+  if (!status) {
+    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
+                      "try a different address!"));
+    Serial.print("SensorID was: 0x"); Serial.println(bmp.sensorID(),16);
+    Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+    Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+    Serial.print("        ID of 0x60 represents a BME 280.\n");
+    Serial.print("        ID of 0x61 represents a BME 680.\n");
+    while (1) delay(10);
+  }
+
+  /* Default settings from datasheet. */
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 #endif
 
   timeClient.begin();
@@ -197,6 +228,9 @@ void publishData() {
 #if ENABLE_CO2
   doc["co2"] = ppm_uart;
 #endif
+#if ENABLE_PRESSURE
+  doc["pressure"] = pressure;
+#endif
 
   serializeJson(doc, jsonPayload);
 
@@ -238,6 +272,15 @@ void readSensorData() {
     ppm_uart = co2.readCO2UART();
   }
 #endif
+
+#if ENABLE_PRESSURE
+  pressure = bmp.readPressure();
+
+  Serial.print(F("Pressure = "));
+  Serial.print(pressure);
+  Serial.println(" Pa");
+#endif
+
 }
 
 void getCurrentTime() {
@@ -318,6 +361,16 @@ void renderDisplay() {
   }
   else {
     display.printf("%dppm", ppm_uart);
+  }
+#endif
+
+#if ENABLE_PRESSURE
+  if (pressure < 0) {
+    display.print("n/a Pa");
+  }
+  else {
+    display.setCursor(60, 55);
+    display.printf("%.2fPa", pressure);
   }
 #endif
 
