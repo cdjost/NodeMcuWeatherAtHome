@@ -10,3 +10,4 @@
 #define ENABLE_MQTT true
 #define ENABLE_CO2 true
 #define ENABLE_AIR_WARNING true
+#define ENABLE_PRESSURE false
