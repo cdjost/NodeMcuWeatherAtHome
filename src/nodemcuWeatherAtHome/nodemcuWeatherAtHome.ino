@@ -7,6 +7,7 @@
 #include <WiFiUdp.h>
 #include "config.h"
 #include <ArduinoOTA.h>
+#include <time.h>
 
 #if ENABLE_PRESSURE
 #include <Adafruit_BMP280.h>
@@ -39,10 +40,13 @@ HTU21D sensor;
 
 // Wifi Signalstärke
 int32_t rssi;
+// Wifi connection check
+unsigned long previousMillis = 0;
+unsigned long interval = 30000;
 
 // NTP
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org");
+time_t now;
+tm tm;
 
 #if ENABLE_PRESSURE
 Adafruit_BMP280 bmp;
@@ -108,8 +112,7 @@ void setup() {
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 #endif
 
-  timeClient.begin();
-  timeClient.setTimeOffset(3600);
+  configTime(TIME_ZOME, NTP_SERVER);
 
   sensor.begin();
 
@@ -124,7 +127,7 @@ void setupWiFi() {
   Serial.print("Connecting to Wifi Network");
   while (WiFi.status() != WL_CONNECTED)
   {
-    delay(500);
+    delay(1000);
     Serial.print(".");
   }
   Serial.print("Connected, IP address: ");
@@ -191,7 +194,6 @@ void connectMQTT() {
 
 void loop() {
   ArduinoOTA.handle();
-  timeClient.update();
 
   if (millis() - lastRSSIRead > RSSI_READ_THRESHOLD) {
     rssi = WiFi.RSSI();
@@ -209,7 +211,21 @@ void loop() {
   getCurrentTime();
   renderDisplay();
 
+  checkWifi();
+
   delay(1000);
+}
+
+void checkWifi() {
+  unsigned long currentMillis = millis();
+  // if WiFi is down, try reconnecting
+  if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >=interval)) {
+  Serial.print(millis());
+  Serial.println("Reconnecting to WiFi...");
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  previousMillis = currentMillis;
+}
 }
 
 #if ENABLE_MQTT
@@ -257,7 +273,7 @@ void initDisplay() {
   display.setTextColor(WHITE);
   display.setTextSize(3);
   display.setCursor(0, (SCREEN_HEIGHT / 2) - 10);
-  display.println("Loading...");
+  display.println("Loading");
   display.display();
 }
 
@@ -284,8 +300,10 @@ void readSensorData() {
 }
 
 void getCurrentTime() {
-  hour = timeClient.getHours();
-  minute = timeClient.getMinutes();
+  time(&now);                       // read the current time
+  localtime_r(&now, &tm);           // update the structure tm with the current time
+  hour = tm.tm_hour;
+  minute = tm.tm_min;
 }
 
 void renderDisplay() {
@@ -381,11 +399,9 @@ void renderDisplay() {
     }
     // 30 Sekunden lang Warnung anzeigen danach 30 Sekunden lang Messwerte
     if ((millis() - air_warn_start_time) < 30000) {
-      display.fillRect(0, 50, SCREEN_WIDTH, 14, WHITE);
+      display.fillRect(0, 51, SCREEN_WIDTH, 14, BLACK);
       display.setCursor(25, 55);
-      display.setTextColor(BLACK);
       display.print("bitte Lueften");
-      display.setTextColor(WHITE);
     }
     else if ((millis() - air_warn_start_time) > 60000) {
       air_warn_start_time = 0;
