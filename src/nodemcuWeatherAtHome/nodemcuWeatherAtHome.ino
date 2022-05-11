@@ -138,7 +138,7 @@ void setupWiFi() {
     {
       break;
     }
-  }
+  } 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
   WiFi.setAutoReconnect(true);
@@ -320,7 +320,8 @@ void renderDisplay() {
 
 
   // Turns the display off at night
-  if ((hour < 6 || hour >= 23) && !DISABLE_DISPLAY_OFF) {
+  // keep display enabled when wifi isn't connected since we can't sync ntp time
+  if ((hour < 6 || hour >= 23) && !DISABLE_DISPLAY_OFF && (WiFi.status() == WL_CONNECTED)) {
     if (isDisplayOn) {
       display.ssd1306_command(SSD1306_DISPLAYOFF);
       isDisplayOn = false;
@@ -356,14 +357,18 @@ void renderDisplay() {
 
   display.setCursor(65, 2);
 
-  char timeAnimation[6];
-  if (isDelimiterShowing) {
-    sprintf(timeAnimation, "%02d:%02d", hour, minute);
-  } else {
-    sprintf(timeAnimation, "%02d %02d", hour, minute);
+  // don't display time if we aren't connected to wifi, since we cant be sure if we are synced with the ntp server
+  if((WiFi.status() == WL_CONNECTED))
+  {
+    char timeAnimation[6];
+    if (isDelimiterShowing) {
+      sprintf(timeAnimation, "%02d:%02d", hour, minute);
+    } else {
+      sprintf(timeAnimation, "%02d %02d", hour, minute);
+    }
+    isDelimiterShowing = !isDelimiterShowing;
+    display.print(timeAnimation);
   }
-  isDelimiterShowing = !isDelimiterShowing;
-  display.print(timeAnimation);
 
   display.setTextColor(WHITE);
 
