@@ -125,10 +125,19 @@ void setupWiFi() {
   WiFi.hostname(HOST);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to Wifi Network");
+  int maxtries = 5;
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(1000);
     Serial.print(".");
+    if(maxtries >= 0)
+    {
+      maxtries--;
+    }
+    else
+    {
+      break;
+    }
   }
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
