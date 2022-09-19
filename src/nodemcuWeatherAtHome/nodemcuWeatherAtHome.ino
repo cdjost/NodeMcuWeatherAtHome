@@ -14,7 +14,7 @@
 #endif
 
 #if ENABLE_CO2
-#include <MHZ.h>
+#include "MHZ19.h"
 #endif
 
 #if ENABLE_MQTT
@@ -72,7 +72,9 @@ int hour = 0;
 int minute = 0;
 
 #if ENABLE_CO2
-MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
+MHZ19 co2MHZ19;
+SoftwareSerial co2Serial(MH_Z19_RX, MH_Z19_TX);
+unsigned long preHeatTimer = 0;
 #endif
 
 void setup() {
@@ -88,6 +90,12 @@ void setup() {
 #if ENABLE_MQTT
   mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
   connectMQTT();
+#endif
+
+#if ENABLE_CO2
+  co2Serial.begin(9600); 
+  co2MHZ19.begin(co2Serial);
+  static byte timeout = 0;
 #endif
 
 #if ENABLE_PRESSURE
@@ -293,8 +301,8 @@ void readSensorData() {
   }
 
 #if ENABLE_CO2
-  if (co2.isReady()) {
-    ppm_uart = co2.readCO2UART();
+  if (millis() - getDataTimer >= 2000) {
+    ppm_uart = co2MHZ19.getCO2();
   }
 #endif
 
@@ -325,7 +333,16 @@ void renderDisplay() {
     if (isDisplayOn) {
       display.ssd1306_command(SSD1306_DISPLAYOFF);
       isDisplayOn = false;
-    }
+
+      myMHZ19.recoveryReset();                                            // Recovery Reset
+      delay(30000);       
+      for (byte i = 0; i < 3; i++) {
+        myMHZ19.verify();                                              // verification check
+          if (myMHZ19.errorCode == RESULT_OK){
+            timeout = 0;
+            break;
+          }
+      }
     return;
   }
   else if (!isDisplayOn) {
@@ -388,7 +405,7 @@ void renderDisplay() {
   display.setCursor(80, 55);
 
 #if ENABLE_CO2
-  if (ppm_uart < 0) {
+  if (ppm_uart < 400) {
     display.print("n/a ppm");
   }
   else {
