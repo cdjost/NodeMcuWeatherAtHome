@@ -8,6 +8,7 @@
 #include "config.h"
 #include <ArduinoOTA.h>
 #include <time.h>
+#include <SoftwareSerial.h>
 
 #if ENABLE_PRESSURE
 #include <Adafruit_BMP280.h>
@@ -65,6 +66,7 @@ float pressure = -1;
 
 unsigned long air_warn_start_time = 0;
 unsigned long reboot = 0;
+unsigned long co2DataTimer = 0;
 unsigned long lastSensorRead = millis();
 unsigned long lastRSSIRead = millis();
 
@@ -73,7 +75,8 @@ int hour = 0;
 int minute = 0;
 
 #if ENABLE_CO2
-MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
+MHZ19 co2MHZ19;                                             // Constructor for library
+SoftwareSerial co2Serial(MH_Z19_RX, MH_Z19_TX);
 #endif
 
 void setup() {
@@ -85,6 +88,12 @@ void setup() {
 
   setupWiFi();
   setupOTA();
+
+#if ENABLE_CO2
+    co2Serial.begin(9600);                               // (Uno example) device to MH-Z19 serial start   
+    co2MHZ19.begin(co2Serial);
+    co2MHZ19.autoCalibration();
+#endif
 
 #if ENABLE_MQTT
   mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
@@ -204,7 +213,6 @@ void connectMQTT() {
 
 void loop() {
   ArduinoOTA.handle();
-  ArduinoOTA.poll();  
 
   if (millis() - lastRSSIRead > RSSI_READ_THRESHOLD) {
     rssi = WiFi.RSSI();
@@ -297,8 +305,8 @@ void readSensorData() {
   }
 
 #if ENABLE_CO2
-  if (co2.isReady()) {
-    ppm_uart = co2.readCO2UART();
+  if (millis() - co2DataTimer >= 2000) {
+    ppm_uart = co2MHZ19.getCO2(); 
   }
 #endif
 
