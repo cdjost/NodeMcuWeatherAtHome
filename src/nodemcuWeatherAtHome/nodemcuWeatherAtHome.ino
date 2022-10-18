@@ -14,7 +14,7 @@
 #endif
 
 #if ENABLE_CO2
-#include <MHZ.h>
+#include <MHZ19.h>
 #endif
 
 #if ENABLE_MQTT
@@ -64,6 +64,7 @@ int ppm_uart = -1;
 float pressure = -1;
 
 unsigned long air_warn_start_time = 0;
+unsigned long reboot = 0;
 unsigned long lastSensorRead = millis();
 unsigned long lastRSSIRead = millis();
 
@@ -203,6 +204,7 @@ void connectMQTT() {
 
 void loop() {
   ArduinoOTA.handle();
+  ArduinoOTA.poll();  
 
   if (millis() - lastRSSIRead > RSSI_READ_THRESHOLD) {
     rssi = WiFi.RSSI();
@@ -221,6 +223,8 @@ void loop() {
   renderDisplay();
 
   checkWifi();
+
+  restartEspTimer();
 
   delay(1000);
 }
@@ -313,6 +317,17 @@ void getCurrentTime() {
   localtime_r(&now, &tm);           // update the structure tm with the current time
   hour = tm.tm_hour;
   minute = tm.tm_min;
+}
+
+void restartEspTimer() {
+  if (reboot == 0) {
+      reboot = millis();
+    }
+    
+    if ((millis() - reboot) > 604800000){
+      reboot = 0;
+      ESP.restart();
+  }
 }
 
 void renderDisplay() {
