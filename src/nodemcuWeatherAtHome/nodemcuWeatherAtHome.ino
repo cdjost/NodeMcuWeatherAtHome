@@ -102,7 +102,7 @@ void setup() {
 
 #if ENABLE_PRESSURE
   unsigned status;
-  status = bmp.begin();
+  status = bmp.begin(BMP280_ADDRESS_ALT);
   if (!status) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
                       "try a different address!"));
