@@ -23,8 +23,8 @@
 #include <ArduinoJson.h>
 #endif
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define SCREEN_WIDTH 128  // OLED display width, in pixels
+#define SCREEN_HEIGHT 64  // OLED display height, in pixels
 
 #define MH_Z19_RX D7  // D7
 #define MH_Z19_TX D6  // D6
@@ -65,7 +65,9 @@ int ppm_uart = -1;
 float pressure = -1;
 
 unsigned long air_warn_start_time = 0;
+#if ENABLE_RESTART
 unsigned long reboot = 0;
+#endif
 unsigned long co2DataTimer = 0;
 unsigned long lastSensorRead = millis();
 unsigned long lastRSSIRead = millis();
@@ -75,7 +77,7 @@ int hour = 0;
 int minute = 0;
 
 #if ENABLE_CO2
-MHZ19 co2MHZ19;                                             // Constructor for library
+MHZ19 co2MHZ19;  // Constructor for library
 SoftwareSerial co2Serial(MH_Z19_RX, MH_Z19_TX);
 #endif
 
@@ -90,9 +92,9 @@ void setup() {
   setupOTA();
 
 #if ENABLE_CO2
-    co2Serial.begin(9600);                               // (Uno example) device to MH-Z19 serial start   
-    co2MHZ19.begin(co2Serial);
-    co2MHZ19.autoCalibration();
+  co2Serial.begin(9600);  // (Uno example) device to MH-Z19 serial start
+  co2MHZ19.begin(co2Serial);
+  co2MHZ19.autoCalibration();
 #endif
 
 #if ENABLE_MQTT
@@ -105,8 +107,9 @@ void setup() {
   status = bmp.begin(BMP280_ADDRESS_ALT);
   if (!status) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
-                      "try a different address!"));
-    Serial.print("SensorID was: 0x"); Serial.println(bmp.sensorID(),16);
+                     "try a different address!"));
+    Serial.print("SensorID was: 0x");
+    Serial.println(bmp.sensorID(), 16);
     Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
     Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
     Serial.print("        ID of 0x60 represents a BME 280.\n");
@@ -136,19 +139,15 @@ void setupWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print("Connecting to Wifi Network");
   int maxtries = 5;
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
-    if(maxtries >= 0)
-    {
+    if (maxtries >= 0) {
       maxtries--;
-    }
-    else
-    {
+    } else {
       break;
     }
-  } 
+  }
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
   WiFi.setAutoReconnect(true);
@@ -161,9 +160,9 @@ void setupOTA() {
 
   ArduinoOTA.onStart([]() {
     Serial.println("Start updating");
-    #if ENABLE_MQTT
+#if ENABLE_MQTT
     mqttClient.disconnect();
-    #endif
+#endif
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -204,8 +203,7 @@ void setupOTA() {
 void connectMQTT() {
   if (mqttClient.connect(HOST, MQTT_USER, MQTT_PW)) {
     // Serial.println("MQTT connected");
-  }
-  else {
+  } else {
     Serial.println("Error connecting to MQTT broker");
   }
 }
@@ -219,7 +217,7 @@ void loop() {
     lastRSSIRead = millis();
   }
 
-  if (millis() - lastSensorRead > SENSOR_READ_THRESHOLD ) {
+  if (millis() - lastSensorRead > SENSOR_READ_THRESHOLD) {
     readSensorData();
 #if ENABLE_MQTT
     publishData();
@@ -231,8 +229,9 @@ void loop() {
   renderDisplay();
 
   checkWifi();
-
+#if ENABLED_RESTART
   restartEspTimer();
+#endif
 
   delay(1000);
 }
@@ -240,23 +239,17 @@ void loop() {
 void checkWifi() {
   unsigned long currentMillis = millis();
   // if WiFi is down, try reconnecting
-  if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >=interval)) {
-  Serial.print(millis());
-  Serial.println("Reconnecting to WiFi...");
-  WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  previousMillis = currentMillis;
-}
+  if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >= interval)) {
+    Serial.print(millis());
+    Serial.println("Reconnecting to WiFi...");
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    previousMillis = currentMillis;
+  }
 }
 
 #if ENABLE_MQTT
 void publishData() {
-#if ENABLE_CO2
-  if (ppm_uart < 0) {
-    return;
-  }
-#endif
-
   StaticJsonDocument<200> doc;
   char jsonPayload[200];
   doc["id"] = HOST;
@@ -280,9 +273,10 @@ void publishData() {
 #endif
 
 void initDisplay() {
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
-    for (;;);
+    for (;;)
+      ;
   }
 
 
@@ -306,7 +300,11 @@ void readSensorData() {
 
 #if ENABLE_CO2
   if (millis() - co2DataTimer >= 2000) {
-    ppm_uart = co2MHZ19.getCO2(); 
+    int tmp_ppm_uart = co2MHZ19.getCO2();
+    if (co2MHZ19.errorCode == RESULT_OK)  // RESULT_OK is an alis for 1. Either can be used to confirm the response was OK.
+    {
+      ppm_uart = tmp_ppm_uart;
+    }     
   }
 #endif
 
@@ -317,26 +315,27 @@ void readSensorData() {
   Serial.print(pressure);
   Serial.println(" Pa");
 #endif
-
 }
 
 void getCurrentTime() {
-  time(&now);                       // read the current time
-  localtime_r(&now, &tm);           // update the structure tm with the current time
+  time(&now);              // read the current time
+  localtime_r(&now, &tm);  // update the structure tm with the current time
   hour = tm.tm_hour;
   minute = tm.tm_min;
 }
 
+#if ENABLE_RESTART
 void restartEspTimer() {
   if (reboot == 0) {
-      reboot = millis();
-    }
-    
-    if ((millis() - reboot) > 604800000){
-      reboot = 0;
-      ESP.restart();
+    reboot = millis();
+  }
+
+  if ((millis() - reboot) > 604800000) {
+    reboot = 0;
+    ESP.restart();
   }
 }
+#endif
 
 void renderDisplay() {
   display.clearDisplay();
@@ -350,8 +349,7 @@ void renderDisplay() {
       isDisplayOn = false;
     }
     return;
-  }
-  else if (!isDisplayOn) {
+  } else if (!isDisplayOn) {
     display.ssd1306_command(SSD1306_DISPLAYON);
     isDisplayOn = true;
   }
@@ -375,14 +373,13 @@ void renderDisplay() {
     }
   }
 
-  display.setTextSize(2); // Texthöhe 14 Pixel Breite 10?
+  display.setTextSize(2);  // Texthöhe 14 Pixel Breite 10?
   display.setTextColor(WHITE);
 
   display.setCursor(65, 2);
 
   // don't display time if we aren't connected to wifi, since we cant be sure if we are synced with the ntp server
-  if((WiFi.status() == WL_CONNECTED))
-  {
+  if ((WiFi.status() == WL_CONNECTED)) {
     char timeAnimation[6];
     if (isDelimiterShowing) {
       sprintf(timeAnimation, "%02d:%02d", hour, minute);
@@ -413,8 +410,7 @@ void renderDisplay() {
 #if ENABLE_CO2
   if (ppm_uart < 0) {
     display.print("n/a ppm");
-  }
-  else {
+  } else {
     display.printf("%dppm", ppm_uart);
   }
 #endif
@@ -422,8 +418,7 @@ void renderDisplay() {
 #if ENABLE_PRESSURE
   if (pressure < 0) {
     display.print("n/a Pa");
-  }
-  else {
+  } else {
     display.setCursor(60, 55);
     display.printf("%.2fPa", pressure);
   }
@@ -439,12 +434,10 @@ void renderDisplay() {
       display.fillRect(0, 51, SCREEN_WIDTH, 14, BLACK);
       display.setCursor(25, 55);
       display.print("bitte Lueften");
-    }
-    else if ((millis() - air_warn_start_time) > 60000) {
+    } else if ((millis() - air_warn_start_time) > 60000) {
       air_warn_start_time = 0;
     }
-  }
-  else {
+  } else {
     air_warn_start_time = 0;
   }
 #endif
