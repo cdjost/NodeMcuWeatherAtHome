@@ -11,6 +11,7 @@
 #define ENABLE_CO2 true
 #define ENABLE_AIR_WARNING true
 #define ENABLE_PRESSURE false
+#define ENABLE_RESTART false
 // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 #define TIME_ZOME "CET-1CEST,M3.5.0,M10.5.0/3"
 #define NTP_SERVER "de.pool.ntp.org"
