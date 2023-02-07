@@ -92,7 +92,7 @@ void setup() {
 #if ENABLE_CO2
     co2Serial.begin(9600);                               // (Uno example) device to MH-Z19 serial start   
     co2MHZ19.begin(co2Serial);
-    co2MHZ19.autoCalibration();
+    co2MHZ19.autoCalibration(false);
 #endif
 
 #if ENABLE_MQTT
